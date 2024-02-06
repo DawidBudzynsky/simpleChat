@@ -3,39 +3,80 @@ package main
 import (
 	"fmt"
 	"net"
+	"sync"
 )
 
 func main() {
-	server_sock, err := net.Listen("tcp", ":8080")
+	clientList := NewClientList()
+	ln, err := net.Listen("tcp", ":8080")
 	if err != nil {
 		fmt.Println(err)
 		return
 	}
 
 	for {
-		client_sock, err := server_sock.Accept()
+		client_sock, err := ln.Accept()
 		if err != nil {
 			fmt.Println(err)
 			continue
 		}
-
-		go handleConnection(client_sock)
+		clientList.Add(client_sock)
+		fmt.Println(clientList.List())
+		go handleConnection(client_sock, clientList)
 	}
 }
 
-func handleConnection(conn net.Conn) {
-	defer conn.Close()
+type ClientList struct {
+	clients map[net.Conn]struct{}
+	sync.RWMutex
+}
 
-	buf := make([]byte, 1024)
-	_, err := conn.Read(buf)
-	if err != nil {
-		fmt.Println(err)
-		return
+func NewClientList() *ClientList {
+	return &ClientList{
+		clients: make(map[net.Conn]struct{}),
 	}
-	_, err = conn.Write([]byte("hello"))
-	if err != nil {
-		fmt.Println(err)
-		return
+}
+
+func (cl *ClientList) Add(client net.Conn) {
+	cl.Lock()
+	defer cl.Unlock()
+	cl.clients[client] = struct{}{}
+}
+
+func (cl *ClientList) Remove(client net.Conn) {
+	cl.Lock()
+	defer cl.Unlock()
+	delete(cl.clients, client)
+}
+
+func (cl *ClientList) List() []net.Conn {
+	cl.RLock()
+	defer cl.RUnlock()
+	clients := make([]net.Conn, 0, len(cl.clients))
+	for client := range cl.clients {
+		clients = append(clients, client)
 	}
-	fmt.Printf("Received from client: %s\n", buf)
+	return clients
+}
+
+func handleConnection(senderConn net.Conn, clientList *ClientList) {
+	for {
+		buf := make([]byte, 1024)
+		_, err := senderConn.Read(buf)
+		if err != nil {
+			fmt.Println(err)
+			return
+		}
+
+		for client := range clientList.clients {
+			if client != senderConn {
+				_, err = client.Write(buf)
+				if err != nil {
+					fmt.Println(err)
+					return
+				}
+			}
+		}
+		fmt.Printf("Received from client: %s\n", buf)
+	}
 }

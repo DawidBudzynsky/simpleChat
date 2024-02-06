@@ -3,7 +3,10 @@ package main
 import (
 	"fmt"
 	"net"
-	"sync"
+	// "sync"
+	"bufio"
+	"os"
+	"strings"
 )
 
 func main() {
@@ -12,24 +15,31 @@ func main() {
 		fmt.Println(err)
 		return
 	}
-	defer server_conn.Close()
 
-	var wg sync.WaitGroup
-	wg.Add(1)
-	go func(conn net.Conn, wg *sync.WaitGroup) {
-		defer wg.Done()
-		buffer := make([]byte, 1024)
-		_, err := conn.Read(buffer)
-		if err != nil {
-			panic(err)
+	go func(conn net.Conn) {
+		for {
+			buffer := make([]byte, 1024)
+			_, err := conn.Read(buffer)
+			if err != nil {
+				panic(err)
+			}
+			fmt.Printf("Received from server: %s\n", buffer)
 		}
-		fmt.Printf("Received from server: %s\n", buffer)
-	}(server_conn, &wg)
+	}(server_conn)
 
-	_, err = server_conn.Write([]byte("Hello, server!"))
-	if err != nil {
-		fmt.Println(err)
-		return
+	for {
+		reader := bufio.NewReader(os.Stdin)
+		text, err := reader.ReadString('\n')
+		if err != nil {
+			fmt.Println("error reading input: ", err)
+			continue
+		}
+		text = strings.TrimSpace(text)
+
+		_, err = server_conn.Write([]byte(text))
+		if err != nil {
+			fmt.Println(err)
+			return
+		}
 	}
-	wg.Wait()
 }

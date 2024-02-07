@@ -3,12 +3,11 @@ package main
 import (
 	"fmt"
 	"net"
-	"sync"
 )
 
 func main() {
-	clientList := NewClientList()
 	ln, err := net.Listen("tcp", ":8080")
+	clientList := NewClientList()
 	if err != nil {
 		fmt.Println(err)
 		return
@@ -26,45 +25,13 @@ func main() {
 	}
 }
 
-type ClientList struct {
-	clients map[net.Conn]struct{}
-	sync.RWMutex
-}
-
-func NewClientList() *ClientList {
-	return &ClientList{
-		clients: make(map[net.Conn]struct{}),
-	}
-}
-
-func (cl *ClientList) Add(client net.Conn) {
-	cl.Lock()
-	defer cl.Unlock()
-	cl.clients[client] = struct{}{}
-}
-
-func (cl *ClientList) Remove(client net.Conn) {
-	cl.Lock()
-	defer cl.Unlock()
-	delete(cl.clients, client)
-}
-
-func (cl *ClientList) List() []net.Conn {
-	cl.RLock()
-	defer cl.RUnlock()
-	clients := make([]net.Conn, 0, len(cl.clients))
-	for client := range cl.clients {
-		clients = append(clients, client)
-	}
-	return clients
-}
-
 func handleConnection(senderConn net.Conn, clientList *ClientList) {
 	for {
 		buf := make([]byte, 1024)
 		_, err := senderConn.Read(buf)
 		if err != nil {
-			fmt.Println(err)
+			clientList.Remove(senderConn)
+			fmt.Println(clientList.List())
 			return
 		}
 

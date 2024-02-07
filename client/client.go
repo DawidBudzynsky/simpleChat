@@ -1,10 +1,9 @@
 package main
 
 import (
+	"bufio"
 	"fmt"
 	"net"
-	// "sync"
-	"bufio"
 	"os"
 	"strings"
 )
@@ -16,17 +15,22 @@ func main() {
 		return
 	}
 
-	go func(conn net.Conn) {
-		for {
-			buffer := make([]byte, 1024)
-			_, err := conn.Read(buffer)
-			if err != nil {
-				panic(err)
-			}
-			fmt.Printf("Received from server: %s\n", buffer)
-		}
-	}(server_conn)
+	go readFromServer(server_conn)
+	sendData(server_conn)
+}
 
+func readFromServer(conn net.Conn) {
+	for {
+		buffer := make([]byte, 1024)
+		_, err := conn.Read(buffer)
+		if err != nil {
+			panic(err)
+		}
+		fmt.Printf("Received from server: %s\n", buffer)
+	}
+}
+
+func sendData(server_conn net.Conn) {
 	for {
 		reader := bufio.NewReader(os.Stdin)
 		text, err := reader.ReadString('\n')

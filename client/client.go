@@ -18,6 +18,7 @@ const (
 
 func main() {
 	reader := bufio.NewReader(os.Stdin)
+
 	server_conn, err := net.Dial(conn_type, conn_addr)
 	if err != nil {
 		fmt.Println(err)
@@ -25,11 +26,7 @@ func main() {
 	}
 
 	go readFromServer(server_conn, os.Stdout)
-	sendData(server_conn, reader)
-}
-
-type ReadFromConn interface {
-	Read(b []byte) (n int, err error)
+	sendDataLoop(server_conn, reader)
 }
 
 func readFromServer(conn net.Conn, writer io.Writer) {
@@ -48,22 +45,25 @@ func readConn(conn net.Conn, writer io.Writer) {
 	fmt.Fprintln(writer, string(buffer))
 }
 
+func sendDataLoop(server_conn net.Conn, reader *bufio.Reader) {
+	for {
+		sendData(server_conn, reader)
+	}
+}
+
 type InputReader interface {
 	ReadString(delim byte) (string, error)
 }
 
-func sendData(server_conn net.Conn, reader *bufio.Reader) {
-	for {
-		text, err := reader.ReadString('\n')
-		if err != nil {
-			fmt.Println("error reading input: ", err)
-			continue
-		}
-		text = strings.TrimSpace(text)
-		_, err = server_conn.Write([]byte(text))
-		if err != nil {
-			fmt.Println(err)
-			return
-		}
+func sendData(server_conn net.Conn, reader InputReader) {
+	text, err := reader.ReadString('\n')
+	if err != nil {
+		fmt.Println("error reading input: ", err)
+	}
+	text = strings.TrimSpace(text)
+	_, err = server_conn.Write([]byte(text))
+	if err != nil {
+		fmt.Println(err)
+		return
 	}
 }

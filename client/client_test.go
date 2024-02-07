@@ -2,6 +2,7 @@ package main
 
 import (
 	"net"
+	"strings"
 	"sync"
 	"testing"
 )
@@ -43,4 +44,38 @@ func TestReadFromServer(t *testing.T) {
 	if output != expected {
 		t.Errorf("Expected output: %q, got: %q", expected, output)
 	}
+}
+
+type MockReader struct {
+	word string
+}
+
+func (r *MockReader) ReadString(delim byte) (string, error) {
+	return r.word, nil
+}
+
+func TestSendData(t *testing.T) {
+	clientConn, serverConn := net.Pipe()
+	reader := &MockReader{word: "Im sending this"}
+
+	go func() {
+		sendData(serverConn, reader)
+	}()
+	output := ReadSentData(t, clientConn)
+
+	expected := "Im sending this"
+	if output != expected {
+		t.Errorf("Expected output: %q, got: %q", expected, output)
+	}
+}
+
+func ReadSentData(t testing.TB, clientConn net.Conn) (output string) {
+	t.Helper()
+
+	buffer := make([]byte, 1024)
+	n, err := clientConn.Read(buffer)
+	if err != nil {
+		t.Fatalf("Error reading from client connection: %v", err)
+	}
+	return strings.TrimSpace(string(buffer[:n]))
 }

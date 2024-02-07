@@ -44,6 +44,5 @@ func handleConnection(senderConn net.Conn, clientList *ClientList) {
 				}
 			}
 		}
-		fmt.Printf("Received from client: %s\n", buf)
 	}
 }
